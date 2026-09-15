@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handwritten Character Recognition | CNN Deep Learning</title>
+    <meta name="description" content="Production-ready Handwritten Character Recognition web application using Deep Learning (CNN), Flask backend, and OpenCV preprocessing.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="app-background">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Top Header Navigation -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div>
+                    <h1 class="logo-title">NeuroScript AI</h1>
+                    <p class="logo-subtitle">Handwritten Character Recognition using CNN</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div class="model-badge" id="modelStatusBadge">
+                    <span class="pulse-dot green"></span>
+                    <span id="modelStatusText">CNN Model Ready</span>
+                </div>
+                <button class="btn btn-outline" id="btnMetricsModal">
+                    <i class="fa-solid fa-chart-line"></i> Model Metrics
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Workbench Grid -->
+        <main class="workbench-grid">
+
+            <!-- Left Panel: Input Section -->
+            <section class="card glass-card input-section">
+                <div class="card-header">
+                    <div class="input-tabs">
+                        <button class="tab-btn active" data-tab="canvas">
+                            <i class="fa-solid fa-pen-nib"></i> Draw Canvas
+                        </button>
+                        <button class="tab-btn" data-tab="upload">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- Tab 1: Interactive Drawing Canvas -->
+                    <div class="tab-content active" id="tabCanvas">
+                        <div class="canvas-wrapper">
+                            <canvas id="paintCanvas" width="280" height="280"></canvas>
+                            <div class="canvas-placeholder" id="canvasHint">
+                                <i class="fa-solid fa-hand-pointer"></i>
+                                <span>Draw a digit (0-9) or letter (A-Z) here</span>
+                            </div>
+                        </div>
+
+                        <div class="canvas-toolbar">
+                            <div class="stroke-control">
+                                <label for="strokeWidth"><i class="fa-solid fa-paintbrush"></i> Size:</label>
+                                <input type="range" id="strokeWidth" min="10" max="30" value="18">
+                            </div>
+                            <div class="canvas-actions">
+                                <button class="btn btn-icon" id="btnClearCanvas" title="Clear Canvas">
+                                    <i class="fa-solid fa-trash-can"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Drag & Drop File Upload -->
+                    <div class="tab-content" id="tabUpload">
+                        <div class="dropzone" id="dropzone">
+                            <input type="file" id="fileInput" accept="image/*" class="file-input-hidden">
+                            <div class="dropzone-content" id="dropzoneContent">
+                                <div class="dropzone-icon">
+                                    <i class="fa-solid fa-file-image"></i>
+                                </div>
+                                <h3>Drag & Drop Image Here</h3>
+                                <p>Supports PNG, JPG, JPEG, BMP (Max 16MB)</p>
+                                <button class="btn btn-secondary btn-sm" id="btnBrowse">Browse Files</button>
+                            </div>
+                            <!-- Image Preview Area -->
+                            <div class="image-preview-container hidden" id="previewContainer">
+                                <img id="imagePreview" src="" alt="Upload Preview">
+                                <button class="btn-remove-image" id="btnRemoveImage" title="Remove Image">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <button class="btn btn-primary btn-block" id="btnPredict">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Predict Character
+                    </button>
+                    <button class="btn btn-secondary" id="btnReset">
+                        <i class="fa-solid fa-rotate-right"></i> Reset
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Prediction & Preprocessing Visualizer -->
+            <section class="card glass-card result-section">
+                <!-- Result Display State -->
+                <div class="result-container" id="resultContainer">
+                    <div class="result-empty-state" id="emptyState">
+                        <div class="empty-icon">
+                            <i class="fa-solid fa-microchip"></i>
+                        </div>
+                        <h3>Awaiting Input</h3>
+                        <p>Draw a character or upload an image, then click <strong>Predict Character</strong> to run neural network inference.</p>
+                    </div>
+
+                    <div class="loading-state hidden" id="loadingState">
+                        <div class="spinner"></div>
+                        <p>Processing with OpenCV & CNN...</p>
+                    </div>
+
+                    <div class="result-active-state hidden" id="activeState">
+                        <!-- Top Prediction Banner -->
+                        <div class="prediction-banner">
+                            <div class="prediction-box">
+                                <span class="prediction-label">Recognized Character</span>
+                                <div class="prediction-character" id="resCharacter">-</div>
+                            </div>
+
+                            <div class="confidence-gauge">
+                                <svg class="gauge-svg" viewBox="0 0 100 100">
+                                    <circle class="gauge-bg" cx="50" cy="50" r="42"></circle>
+                                    <circle class="gauge-progress" id="gaugeProgress" cx="50" cy="50" r="42"></circle>
+                                </svg>
+                                <div class="gauge-text">
+                                    <span id="resConfidence">0%</span>
+                                    <small>Confidence</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top 3 Probability Breakdown -->
+                        <div class="probabilities-card">
+                            <h4><i class="fa-solid fa-chart-bar"></i> Top Predictions</h4>
+                            <div class="candidates-list" id="candidatesList">
+                                <!-- Dynamic candidates bars -->
+                            </div>
+                        </div>
+
+                        <!-- Preprocessing Steps Gallery -->
+                        <div class="preprocessing-card">
+                            <h4><i class="fa-solid fa-eye"></i> OpenCV Preprocessing Pipeline</h4>
+                            <div class="steps-grid">
+                                <div class="step-item">
+                                    <img id="stepOriginal" src="" alt="Original">
+                                    <span>1. Input</span>
+                                </div>
+                                <div class="step-item">
+                                    <img id="stepGray" src="" alt="Grayscale">
+                                    <span>2. Grayscale</span>
+                                </div>
+                                <div class="step-item">
+                                    <img id="stepThresh" src="" alt="Otsu Threshold">
+                                    <span>3. Threshold</span>
+                                </div>
+                                <div class="step-item">
+                                    <img id="stepRoi" src="" alt="ROI Crop">
+                                    <span>4. ROI Bounding</span>
+                                </div>
+                                <div class="step-item highlight">
+                                    <img id="step28" src="" alt="28x28 Grid">
+                                    <span>5. 28x28 Tensor</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Model Metrics & Analytics Modal -->
+    <div class="modal-overlay hidden" id="metricsModal">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-chart-pie"></i> CNN Model Performance & Evaluation</h2>
+                <button class="modal-close" id="btnCloseModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="metrics-summary-grid" id="metricsSummaryGrid">
+                    <div class="metric-card">
+                        <span class="metric-val" id="metricAccuracy">--%</span>
+                        <span class="metric-title">Test Accuracy</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-val" id="metricPrecision">--%</span>
+                        <span class="metric-title">Precision</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-val" id="metricRecall">--%</span>
+                        <span class="metric-title">Recall</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-val" id="metricF1">--%</span>
+                        <span class="metric-title">F1 Score</span>
+                    </div>
+                </div>
+
+                <div class="metrics-visuals">
+                    <div class="visual-card">
+                        <h3>Training & Validation Curves</h3>
+                        <img id="imgHistory" src="/static/metrics/training_history.png" alt="Training History" onerror="this.src='https://via.placeholder.com/600x300/1e293b/64748b?text=Run+train_model.py+to+generate+plots'">
+                    </div>
+                    <div class="visual-card">
+                        <h3>Confusion Matrix</h3>
+                        <img id="imgConfusion" src="/static/metrics/confusion_matrix.png" alt="Confusion Matrix" onerror="this.src='https://via.placeholder.com/600x300/1e293b/64748b?text=Run+train_model.py+to+generate+plots'">
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <h3>Detailed Classification Report</h3>
+                    <pre class="report-text" id="reportText">Loading classification report...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
